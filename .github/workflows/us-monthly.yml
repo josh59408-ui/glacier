@@ -2,10 +2,8 @@
 name: US Monthly Stock Update
 
 on:
-  # 每月 1 日執行（台灣時間 09:30 = UTC 01:30）
-  schedule:
-    - cron: '30 1 1 * *'
-
+  # 每月 1 日台灣時間 09:30 由外部觸發（Google Apps Script 打 workflow_dispatch）。
+  # GitHub 內建 schedule 在公開 repo 60 天無 commit 會被自動停用，已移除。
   # 手動觸發
   workflow_dispatch:
 

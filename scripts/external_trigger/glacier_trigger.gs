@@ -35,6 +35,16 @@ function triggerUS() {
   dispatchWorkflow('us-daily.yml', '美股');
 }
 
+/** 台股每月股票清單更新：每月 1 日台北 09:00 */
+function triggerMonthlyTW() {
+  dispatchWorkflow('monthly.yml', '台股每月');
+}
+
+/** 美股每月股票清單更新：每月 1 日台北 09:30 */
+function triggerMonthlyUS() {
+  dispatchWorkflow('us-monthly.yml', '美股每月');
+}
+
 // ─────────────────────────────────────────────
 // 核心：呼叫 GitHub API 觸發 workflow
 // ─────────────────────────────────────────────
@@ -101,7 +111,13 @@ function setupTriggers() {
   ScriptApp.newTrigger('triggerUS')
     .timeBased().atHour(6).nearMinute(0).everyDays(1).create();
 
-  Logger.log('✅ 觸發器已建立：台股 14:30、美股 06:00（台北時間）');
+  // 每月 1 日：股票清單更新（取代 GitHub 內建 schedule，避免 60 天無 commit 被停用）
+  ScriptApp.newTrigger('triggerMonthlyTW')
+    .timeBased().onMonthDay(1).atHour(9).nearMinute(0).create();
+  ScriptApp.newTrigger('triggerMonthlyUS')
+    .timeBased().onMonthDay(1).atHour(9).nearMinute(30).create();
+
+  Logger.log('✅ 觸發器已建立：台股 14:30、美股 06:00、每月 1 日 09:00/09:30（台北時間）');
   ScriptApp.getProjectTriggers().forEach(t =>
     Logger.log(`  - ${t.getHandlerFunction()}`)
   );
