@@ -1,0 +1,17 @@
+# 測試排程是否正常運作（測試完成後刪除）
+name: Test Schedule
+
+on:
+  schedule:
+    # UTC 16:15 = 台灣時間 00:15
+    - cron: '15 16 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test schedule trigger
+        run: |
+          echo "✅ 排程測試成功！"
+          echo "觸發時間: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "台灣時間: $(TZ='Asia/Taipei' date '+%Y-%m-%d %H:%M:%S')"

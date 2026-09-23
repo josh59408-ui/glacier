@@ -1,0 +1,43 @@
+# 一次性：從原站（glaciercapitaltw-tech/glacier）公開 Release 複製台股／美股資料庫，
+# 建立本 repo 的 db-backup / us-db-backup Release，之後每日任務即可接續累積。
+# 完成後會自動觸發 Deploy Site 部署網站。
+name: Bootstrap Database
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy databases from source release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SRC: https://github.com/glaciercapitaltw-tech/glacier/releases/download
+        run: |
+          set -e
+          curl -fsSL -o /tmp/zf_trend_full.db.gz "$SRC/db-backup/zf_trend_full.db.gz"
+          curl -fsSL -o /tmp/zf_trend_us.db.gz "$SRC/us-db-backup/zf_trend_us.db.gz"
+          ls -la /tmp/*.db.gz
+
+          if ! gh release view db-backup &>/dev/null; then
+            gh release create db-backup --title "Database Backup" --notes "台股資料庫備份"
+          fi
+          gh release upload db-backup /tmp/zf_trend_full.db.gz --clobber
+
+          if ! gh release view us-db-backup &>/dev/null; then
+            gh release create us-db-backup --title "US Database Backup" --notes "美股資料庫備份"
+          fi
+          gh release upload us-db-backup /tmp/zf_trend_us.db.gz --clobber
+          echo "✅ 資料庫已複製到本 repo Release"
+
+      - name: Trigger site deploy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run deploy-site.yml --ref "${{ github.ref_name }}"

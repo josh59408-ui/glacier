@@ -1,0 +1,126 @@
+# 每月股票清單更新任務
+name: Monthly Stock Update
+
+on:
+  # 每月 1 日執行（台灣時間 09:00 = UTC 01:00）
+  schedule:
+    - cron: '0 1 1 * *'
+
+  # 手動觸發
+  workflow_dispatch:
+
+jobs:
+  monthly-task:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 需要寫入權限才能建立 Release
+      actions: read    # 需要讀取權限才能下載 Artifact
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 優先從 GitHub Release 下載資料庫（永久保存）
+      - name: Download database from Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p data
+          echo "嘗試從 Release 下載資料庫..."
+          if gh release download db-backup -p "zf_trend_full.db.gz" -D /tmp/ 2>/dev/null; then
+            echo "解壓縮資料庫..."
+            gunzip -c /tmp/zf_trend_full.db.gz > data/zf_trend.db
+            rm /tmp/zf_trend_full.db.gz
+            echo "✅ 從壓縮檔還原成功"
+            ls -lh data/zf_trend.db
+          else
+            echo "⚠️ Release 中沒有資料庫，嘗試 Artifact..."
+          fi
+        continue-on-error: true
+
+      # 備援：從 Artifact 下載（90 天內有效）
+      - name: Download database from Artifact
+        if: ${{ hashFiles('data/zf_trend.db') == '' }}
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          name: sqlite-database
+          path: data/
+          if_no_artifact_found: warn
+        continue-on-error: true
+
+      - name: Set up Google credentials
+        env:
+          GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+        run: |
+          if [ -n "$GOOGLE_CREDS" ]; then
+            echo "$GOOGLE_CREDS" > credentials.json
+            echo "✅ Google credentials 已設定"
+          else
+            echo "⚠️ 未設定 GOOGLE_CREDENTIALS_JSON"
+          fi
+
+      - name: Initialize system if needed
+        env:
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+        run: |
+          if [ ! -f "data/zf_trend.db" ]; then
+            echo "資料庫不存在，執行初始化..."
+            python main.py init
+          fi
+
+      - name: Run monthly task
+        env:
+          GOOGLE_CREDENTIALS_PATH: credentials.json
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+          SHEET_ID_COMPANY_MASTER: ${{ secrets.SHEET_ID_COMPANY_MASTER }}
+          SHEET_ID_TW_VCP: ${{ secrets.SHEET_ID_TW_VCP }}
+          SHEET_ID_TW_SANXIAN: ${{ secrets.SHEET_ID_TW_SANXIAN }}
+          SHEET_ID_VERIFICATION: ${{ secrets.SHEET_ID_VERIFICATION }}
+        run: |
+          python main.py monthly
+
+      # 備份到 GitHub Release（永久保存）
+      - name: Backup database to Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "備份資料庫到 Release..."
+          # 檢查 release 是否存在，不存在則建立
+          if ! gh release view db-backup &>/dev/null; then
+            echo "建立新的 Release..."
+            gh release create db-backup \
+              --title "Database Backup" \
+              --notes "SQLite 資料庫自動備份 (永久保存)"
+          fi
+          # 壓縮並上傳資料庫（覆蓋舊檔）
+          echo "壓縮資料庫..."
+          gzip -c data/zf_trend.db > /tmp/zf_trend_full.db.gz
+          gh release upload db-backup /tmp/zf_trend_full.db.gz --clobber
+          echo "✅ 備份完成"
+
+      # 同時保存到 Artifact（方便快速存取）
+      - name: Upload database artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlite-database
+          path: data/zf_trend.db
+          retention-days: 90
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 30

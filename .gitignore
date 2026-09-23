@@ -1,0 +1,57 @@
+# 憑證（絕對不要上傳）
+credentials.json
+.env
+.env.*
+!.env.example
+# 多環境憑證（credentials.self.json / credentials.client.json 等）
+credentials.*.json
+
+# 資料庫
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.db.gz
+data/.fuse_hidden*
+
+# 前端產生的資料（由 deploy workflow 產生）
+site/data/filter_results.json
+site/data/index.json
+site/data/months/
+site/data/indicators/
+
+# 本地工作檔
+reports/
+tasks/todo.md
+tmp/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# 日誌
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# 測試
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Claude Code
+.claude/
+
+# Obsidian
+.obsidian/

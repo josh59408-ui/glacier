@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  zf_postgres:
+    image: postgres:15
+    container_name: zf_trend_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zf_trend
+      POSTGRES_USER: zf_user
+      POSTGRES_PASSWORD: zf_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - zf_postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zf_user -d zf_trend"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zf_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zf_trend_app
+    restart: unless-stopped
+    depends_on:
+      zf_postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://zf_user:zf_password@zf_postgres:5432/zf_trend
+      - FINMIND_TOKEN=${FINMIND_TOKEN:-}
+      - GOOGLE_CREDENTIALS_PATH=/app/credentials.json
+      - SHEET_ID_COMPANY_MASTER=${SHEET_ID_COMPANY_MASTER:-}
+      - SHEET_ID_TW_VCP=${SHEET_ID_TW_VCP:-}
+      - SHEET_ID_TW_SANXIAN=${SHEET_ID_TW_SANXIAN:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+    volumes:
+      - ./logs:/app/logs
+      # credentials.json 為可選，如需使用 Google Sheet 請提供
+      # - ./credentials.json:/app/credentials.json:ro
+    networks:
+      - zf_network
+
+volumes:
+  zf_postgres_data:
+
+networks:
+  zf_network:
+    driver: bridge

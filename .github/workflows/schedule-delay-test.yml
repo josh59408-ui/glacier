@@ -1,0 +1,29 @@
+# 排程延遲測試
+# 目的：每小時整點觸發，記錄「實際被觸發的時間」，用來量化 GitHub 排程的真實延遲。
+# 設定為整點(:00)——官方說整點是最擁塞、延遲最嚴重的時段，這樣能測到延遲的上限。
+# 測夠了記得停用：gh workflow disable schedule-delay-test.yml --repo <repo>
+name: Schedule Delay Test
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # 每小時整點 (UTC)
+  workflow_dispatch:       # 允許手動觸發做對照（手動是立即執行，可對比排程延遲）
+
+# 只需讀取權限，不寫任何東西
+permissions:
+  contents: read
+
+jobs:
+  log-time:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 記錄觸發時間
+        run: |
+          echo "========================================"
+          echo "觸發事件      : ${{ github.event_name }}"
+          echo "排程表達式    : ${{ github.event.schedule }}"
+          echo "實際執行 (UTC) : $(date -u '+%Y-%m-%d %H:%M:%S %A')"
+          echo "實際執行 (台北): $(TZ='Asia/Taipei' date '+%Y-%m-%d %H:%M:%S %A')"
+          echo "========================================"
+          echo "排程設定為每小時整點(:00)。實際執行時間與整點的差 = GitHub 排程延遲。"
+          echo "累積數據用 gh run list 對比整點即可看出延遲分佈與是否有整點被丟棄。"
